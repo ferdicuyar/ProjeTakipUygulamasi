@@ -1,0 +1,1374 @@
+﻿@page "/"
+@inject IGenelService service
+@code {
+    Kullanici Kullanan;
+    string uyari = "";
+
+    #region navbar
+    string activeNavlink = "nav-link active";
+    string regularNavlink = "nav-link";
+    bool devamEdenProjedeyiz = false;
+    #endregion
+
+    List<Proje> ButunProjeler;
+    Proje CalistigimProje;
+    decimal Butce;
+    Gosterim gosterilen;
+    int GorevSayisi, NotSayisi;
+    #region Gösterilerin değişkenleri
+    Proje YeniProje;
+    List<Gorev> Gorevler;
+    Gorev YeniGorev;
+    List<GorevNot> GorevNotlari;
+    GorevNot YeniGorevNot;
+    List<AltGorev> AltGorevler;
+    AltGorev YeniAltGorev;
+    List<Kullanici> Kullanicilar;
+    Kullanici YeniKullanici;
+    List<ProjeMaliyet> ProjeMaliyetleri;
+    ProjeMaliyet YeniMaliyet;
+    List<ProjeNot> ProjeNotlari;
+    ProjeNot YeniProjeNot;
+    List<Teknoloji> TumTeknolojiler;
+    List<ProjeTeknoloji> ProjeTeknolojileri;
+    Teknoloji YeniTeknoloji;
+    List<GorevKategori> Kategoriler;
+    int? GorevimId = null;
+    string? formUyarisi = null;
+    Gorev BitecekGorev = null;
+    List<GorevYardimcisi> GorevYardimcilari;
+    #endregion
+    protected override void OnInitialized()
+    {
+        Kullanan = new Kullanici();
+    }
+    void LoginKontrol()
+    {
+        Kullanan = service.LoginKontrol(Kullanan);
+        if (Kullanan==null)
+        {
+            uyari = "Yanlış kullanıcı adı yada şifre";
+            Kullanan = new Kullanici();
+        }
+        else
+        {
+            ButunProjeler = service.TumProjeler();
+            ModlariKapat();
+            StateHasChanged();
+        }
+    }
+    void YeniProjeFormEkraniAc()
+    {
+        ModlariKapat();
+        CalistigimProje = null;
+        Kullanicilar = service.KullanicilariGetir();
+        YeniProje = new Proje() { OlusturmaTarihi = DateTime.Today, ProjeBittimi = false, ProjeBitis = DateTime.Today, ProjeSahibiId = Kullanan.Id };
+        StateHasChanged();
+    }
+    void YeniProjeOlustur()
+    {
+        CalistigimProje=service.YeniProjeOlustur(YeniProje);
+        YeniProje=null;
+        ModlariKapat();
+        ButunProjeler = service.TumProjeler();
+        CalistigimProjeyeGel(CalistigimProje.Id);
+    }
+    void CalistigimProjeyeGel(int projeId)
+    {
+        ModlariKapat();
+        Butce = service.ProjeButcesi(projeId);
+        CalistigimProje = ButunProjeler.FirstOrDefault(x => x.Id == projeId);
+        devamEdenProjedeyiz = !CalistigimProje.ProjeBittimi;
+        gosterilen = Gosterim.None;
+        service.ProjeBilgileri(CalistigimProje.Id, out GorevSayisi, out NotSayisi);
+        StateHasChanged();
+    }
+    void ModlariKapat()
+    {
+        YeniProje = null;
+        gosterilen = Gosterim.None;
+        Gorevler = null;
+        YeniGorev = null;
+        GorevNotlari = null;
+        YeniGorevNot = null;
+        AltGorevler = null;
+        YeniAltGorev = null;
+        Kullanicilar = null;
+        YeniKullanici = null;
+        ProjeMaliyetleri = null;
+        YeniMaliyet = null;
+        ProjeNotlari = null;
+        YeniProjeNot = null;
+        TumTeknolojiler = null;
+        ProjeTeknolojileri = null;
+        YeniTeknoloji = null;
+        Kategoriler = null;
+        formUyarisi = null;
+        GorevimId = null;
+        BitecekGorev = null;
+    }
+    void ModuAyarla(Gosterim modum)
+    {
+        ModlariKapat();
+        service.ProjeBilgileri(CalistigimProje.Id, out GorevSayisi, out NotSayisi);
+        switch (modum)
+        {
+            case Gosterim.Gorevler:
+                Gorevler = service.GorevleriGetir(CalistigimProje.Id, out GorevYardimcilari);
+                break;
+            case Gosterim.Notlar:
+                ProjeNotlari = service.ProjeNotlariniGetir(CalistigimProje.Id);
+                break;
+            case Gosterim.Teknolojiler:
+                TumTeknolojiler=service.TeknolojileriGetir();
+                ProjeTeknolojileri = service.ProjeninTeknolojileriniGetir(CalistigimProje.Id);
+                break;
+            case Gosterim.Butce:
+                ProjeMaliyetleri = service.ButceKalemleriniGetir(CalistigimProje.Id);
+                break;
+            case Gosterim.Kullanicilar:
+                Kullanicilar = service.KullanicilariGetir();
+                break;
+            default:
+                break;
+        }
+        gosterilen = modum;
+    }
+    void GorevBitsinmi(int gorevId)
+    {
+        BitecekGorev = Gorevler.FirstOrDefault(x => x.Id == gorevId);
+    }
+    void GorevBitmesin()
+    {
+        BitecekGorev = null;
+    }
+    void GoreviBitir()
+    {
+        service.GoreviBitir(BitecekGorev);
+        ModuAyarla(gosterilen);
+    }
+    void YeniGorevEkle()
+    {
+        formUyarisi = null;
+        Kullanicilar = service.KullanicilariGetir();
+        Kategoriler = service.KategorileriGetir();
+        YeniGorev = new Gorev()
+        {
+            ProjeId = CalistigimProje.Id,
+            Tamamlandi = false,
+            BaslangicTarihi=DateTime.Today,
+            BeklenenBitis=DateTime.Today
+        };
+        StateHasChanged();
+    }
+    void GorevKayit()
+    {
+        if (YeniGorev.GorevSahibiId==0|YeniGorev.KategoriId==null)
+        {
+            formUyarisi = "Lütfen görev sahibini yada görev kategorisini boş bırakmayın";
+        }
+        else
+        {
+            service.GorevKayit(YeniGorev);
+            ModuAyarla(gosterilen);
+        }
+        StateHasChanged();
+    }
+    void AltGorevleriGoster(int gorevId)
+    {
+        GorevimId = gorevId;
+        GorevNotlari = null;
+        AltGorevler = service.AltGorevleriGetir(gorevId);
+        StateHasChanged();
+    }
+    void AltGorevOlustur()
+    {
+        YeniAltGorev = new AltGorev()
+        {
+            Bittimi = false,
+            GorevId = (int)GorevimId
+        };
+        StateHasChanged();
+    }
+    void AltGorevKayit()
+    {
+        service.AltGorevKayit(YeniAltGorev);
+        YeniAltGorev = null;
+        AltGorevleriGoster((int)GorevimId);
+        StateHasChanged();
+    }
+    void AltGorevleriKapat()
+    {
+        YeniAltGorev = null;
+        GorevimId = null;
+        AltGorevler = null;
+        StateHasChanged();
+    }
+    void NotlariKapat()
+    {
+        YeniGorevNot = null;
+        GorevimId = null;
+        GorevNotlari = null;
+        StateHasChanged();
+    }
+    void AltGoreviBitir(int altGorevId)
+    {
+        YeniAltGorev = AltGorevler.FirstOrDefault(x => x.Id == altGorevId);
+        YeniAltGorev.Bittimi = true;
+        AltGorevKayit();
+    }
+    void GorevNotlariniGoster(int gorevId)
+    {
+        YeniGorevNot = null;
+        AltGorevler = null;
+        GorevimId = gorevId;
+        GorevNotlari = service.GorevNotlariniGetir(gorevId);
+        StateHasChanged();
+    }
+    void GorevNotuHazirla()
+    {
+        YeniGorevNot = new GorevNot() { GorevId = (int)GorevimId, NotSahibiId = Kullanan.Id, NotTarihi = DateTime.Today };
+        StateHasChanged();
+    }
+    void GorevNotKayit()
+    {
+        service.GorevNotKayit(YeniGorevNot);
+        GorevNotlariniGoster((int)GorevimId);
+    }
+    void YeniProjeNotAc()
+    {
+        formUyarisi = null;
+        Kullanicilar = service.KullanicilariGetir();
+        YeniProjeNot = new ProjeNot()
+            {
+                ProjeId = CalistigimProje.Id,
+                KullanicId = Kullanan.Id,
+                Tarih = DateTime.Today,
+                Gundemde = true,
+            };
+        StateHasChanged();
+    }
+    void ProjeNotKayit()
+    {
+        service.ProjeNotKayit(YeniProjeNot);
+        ModuAyarla(gosterilen);
+        StateHasChanged();
+    }
+    void ProjeNotGundemdenDusur(ProjeNot veri)
+    {
+        veri.Gundemde = !veri.Gundemde;
+        service.ProjeNotKayit(veri);
+        ModuAyarla(gosterilen);
+    }
+    void YeniTeknolojiOlusturmaPaneliAc()
+    {
+        YeniTeknoloji = new Teknoloji();
+    }
+    void YeniTeknolojiKaydet()
+    {
+        service.TeknolojiEkle(YeniTeknoloji);
+        ModuAyarla(gosterilen);
+    }
+    void TeknolojiDahilEt(int teknolojiId)
+    {
+        service.ProjeyeTeknolojiEkle(teknolojiId, CalistigimProje.Id);
+        ModuAyarla(gosterilen);
+    }
+    void TeknolojiCikar(int projeTeknolojiId)
+    {
+        service.TeknolojiCikar(projeTeknolojiId);
+        ModuAyarla(gosterilen);
+    }
+    void YeniKullaniciFormu()
+    {
+        YeniKullanici = new();
+        StateHasChanged();
+    }
+    void KullaniciKayit()
+    {
+        service.KullaniciEkle(YeniKullanici);
+        ModuAyarla(gosterilen);
+    }
+    void ButceKayitFormuAc()
+    {
+        YeniMaliyet = new ProjeMaliyet(){Tarih=DateTime.Today, ProjeId=CalistigimProje.Id};
+    }
+    void ButceGuncelle(int butceId)
+    {
+        YeniMaliyet=ProjeMaliyetleri.FirstOrDefault(x=>x.Id==butceId);
+        StateHasChanged();
+    }
+    void YeniButceKayit()
+    {
+        ProjeMaliyetleri=service.ButceKalemiEkleGuncelle(YeniMaliyet);
+        YeniMaliyet = null;
+        Butce = service.ProjeButcesi(CalistigimProje.Id);
+        StateHasChanged();
+    }
+
+    void ButceKomut(int butceId, int komut)
+    {
+        ProjeMaliyet butce = ProjeMaliyetleri.FirstOrDefault(x => x.Id == butceId);
+        if (butce!=null)
+        {
+            switch (komut)
+            {
+                case 1:
+                    butce.Gerçeklesti=true;
+                    break;
+                case 2:
+                    butce.Vazgecildi=true;
+                    break;
+                case 3:
+                    butce.Vazgecildi = false;
+                    break;
+                default:
+                    break;
+            }
+            ProjeMaliyetleri = service.ButceKalemiEkleGuncelle(butce);
+            Butce = service.ProjeButcesi(CalistigimProje.Id);
+            StateHasChanged();
+        }
+
+    }
+    void ProjeBitti()
+    {
+        service.ProjeyiBitir(CalistigimProje);
+        LoginKontrol();
+    }
+}
+@if (Kullanan.Id==null|Kullanan.Id==0)
+{
+    <style>
+        .main {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #C9FFD0;
+        }
+
+        .content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #191919;
+            padding: 40px;
+            border-radius: 20px;
+            color: white;
+        }
+
+            .content h1 {
+                text-transform: uppercase;
+                font-weight: 500;
+            }
+
+            .content h5 {
+                text-transform: uppercase;
+                font-weight: 500;
+            }
+
+        .loginTextbox {
+            border: 0;
+            background: none;
+            display: block;
+            margin: 20px auto;
+            text-align: center;
+            border: 2px solid #3498db;
+            padding: 14px 10px;
+            width: 200px;
+            outline: none;
+            color: white;
+            border-radius: 24px;
+            transition: 0.25s;
+        }
+
+            .loginTextbox:focus {
+                width: 280px;
+                border-color: #2ecc71;
+            }
+
+        input[type="submit"] {
+            border: 0;
+            background: none;
+            display: block;
+            margin: 20px auto;
+            text-align: center;
+            border: 2px solid #2ecc71;
+            padding: 14px 40px;
+            outline: none;
+            color: white;
+            border-radius: 24px;
+            transition: 0.25s;
+            cursor: pointer;
+        }
+
+            input[type="submit"]:hover {
+                background: #2ecc71;
+            }
+    </style>
+    <div class="main">
+        <div class="content">
+            <div class="login">
+                <EditForm Model="Kullanan" OnValidSubmit="LoginKontrol">
+                    <div class="box">
+                        <h1 class="text-center">Proje Yönetim Uygulaması</h1>
+                        <h5 class="text-center">Şifre Giriş Ekranı</h5>
+                        <InputText @bind-Value="Kullanan.KullaniciAdi" placeholder="Kullanıcı Adı" class="loginTextbox" />
+                        <InputText @bind-Value="Kullanan.Sifre" placeholder="Şifre" type="password" class="loginTextbox" />
+                        <input type="submit" value="Login" />
+                        @if (uyari.Length > 0)
+                        {
+                            <br />
+                            <p class="bg-danger">@uyari</p>
+                        }
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+else if (ButunProjeler!=null)
+{
+    <nav class="navbar navbar-expand-sm bg-info navbar-light">
+        <div class="container-fluid">
+            <ul class="navbar-nav">
+                @if (devamEdenProjedeyiz)
+                {
+                    <li class="nav-item dropdown">
+                        <a class="@regularNavlink dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Bitmiş Projeler</a>
+                        <ul class="dropdown-menu" data-bs-target="dropdown-menu">
+                            @foreach (Proje item in ButunProjeler.Where(x=>x.ProjeBittimi==true).ToList())
+                            {
+                                <li><a class="dropdown-item" @onclick="(()=>CalistigimProjeyeGel(item.Id))">@item.ProjeAdi</a></li>
+                            }
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="@activeNavlink dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Devam Eden Projeler</a>
+                        <ul class="dropdown-menu" data-bs-target="dropdown-menu">
+                            @foreach (Proje item in ButunProjeler.Where(x => x.ProjeBittimi == false).ToList())
+                            {
+                                <li><a class="dropdown-item" @onclick="(()=>CalistigimProjeyeGel(item.Id))">@item.ProjeAdi</a></li>
+                            }
+                        </ul>
+                    </li>
+                }
+                else
+                {
+                    <li class="nav-item dropdown">
+                        <a class="@activeNavlink dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Bitmiş Projeler</a>
+                        <ul class="dropdown-menu" data-bs-target="dropdown-menu">
+                            @foreach (Proje item in ButunProjeler.Where(x => x.ProjeBittimi == true).ToList())
+                            {
+                                <li><a class="dropdown-item" @onclick="(()=>CalistigimProjeyeGel(item.Id))">@item.ProjeAdi</a></li>
+                            }
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="@regularNavlink dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Devam Eden Projeler</a>
+                        <ul class="dropdown-menu" data-bs-target="dropdown-menu">
+                            @foreach (Proje item in ButunProjeler.Where(x => x.ProjeBittimi == false).ToList())
+                            {
+                                <li><a class="dropdown-item" @onclick="(()=>CalistigimProjeyeGel(item.Id))">@item.ProjeAdi</a></li>
+                            }
+                        </ul>
+                    </li>
+                }
+                <li class="nav-item"><a class="@regularNavlink" @onclick="YeniProjeFormEkraniAc">Yeni Proje</a></li>
+            </ul>
+        </div>
+    </nav>
+
+
+    <div class="row">
+        <div class="col-12">
+            @if (CalistigimProje == null&&YeniProje==null)
+            {
+                <p class="bg-warning">Lütfen Çalışacağımız projeyi seçiniz</p>
+            }
+            else if (YeniProje!=null)
+            {
+                <EditForm Model="YeniProje" OnValidSubmit="YeniProjeOlustur">
+                    <div class="row">
+                        <div class="col-12">
+                            <br/><br/>
+                            <div class="row">
+                                <div class="col-3"></div>
+                                <div class="col-6">
+                                    <div class="row">
+                                        <div class="col-12 text-center">
+                                            <span class="btn bg-info"><strong>Projenizin İsmi: </strong></span><br/>
+                                            <InputText @bind-Value="YeniProje.ProjeAdi" class="form-control form-control-lg" />
+                                        </div>
+                                        <div class="col-12 text-center">
+                                            <span class="btn bg-info"><strong>Açıklama: </strong></span><br />
+                                            <InputTextArea @bind-Value="YeniProje.Aciklama" class="form-control" rows="5" />
+                                        </div>
+                                        <div class="col-12">
+                                            <br/><hr/>
+                                            <div class="row">
+                                                <div class="col-4">
+                                                    <div class="input-group">
+                                                        <span class="input-group-text bg-info"><strong>Başlangıç: </strong></span>
+                                                        <InputDate class="form-control" @bind-Value="YeniProje.OlusturmaTarihi"/>
+                                                    </div>
+                                                </div>
+                                                <div class="col-4">
+                                                    <div class="input-group">
+                                                        <span class="input-group-text bg-info"><strong>Tahmini Bitiş: </strong></span>
+                                                        <InputDate class="form-control" @bind-Value="YeniProje.ProjeBitis" />
+                                                    </div>
+                                                </div>
+                                                <div class="col-4">
+                                                    <div class="input-group">
+                                                        <span class="input-group-text bg-info"><strong>Proje Sahibi: </strong></span>
+                                                        <InputSelect class="form-select form-select-sm" @bind-Value="YeniProje.ProjeSahibiId">
+                                                            @foreach (var item in Kullanicilar)
+                                                            {
+                                                            <option value=@item.Id>@item.AdiSoyadi</option>
+                                                            }
+                                                        </InputSelect>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <br/><hr/>
+                                            <button class="btn btn-outline-primary" type="submit">Proje Oluştur</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            }
+            else
+            {
+                <br />
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Proje Adı</th>
+                            <th>Oluşturma Tarihi</th>
+                            <th>Proje Yöneticisi</th>
+                            <th>Proje Açıklaması</th>
+                            <th>Tahmini Bitiş?</th>
+                            <th>Görev Sayısı</th>
+                            <th>Not Sayısı</th>
+                            <th>Proje Bütçesi</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>@CalistigimProje.ProjeAdi</td>
+                            <td>@CalistigimProje.OlusturmaTarihi.ToString("dd.MM.yyyy")</td>
+                            <td>@CalistigimProje.ProjeSahibi.AdiSoyadi</td>
+                            <td>@CalistigimProje.Aciklama</td>
+                            <td>@((DateTime)CalistigimProje.ProjeBitis).ToString("dd.MM.yyyy")</td>
+                            <td>@GorevSayisi</td>
+                            <td>@NotSayisi</td>
+                            <td>@Butce TL</td>
+                            @if (CalistigimProje.ProjeBittimi)
+                            {
+                                <td></td>
+                            }
+                            else{
+                            <td><button class="btn btn-primary" @onclick="ProjeBitti">Projeyi Bitir</button></td>}
+                        </tr>
+                    </tbody>
+                </table>
+                <br />
+                <div class="row">
+                    <div class="col-12">
+                        <div class="row">
+                            <div class="col-1"></div>
+                            <div class="col-2">
+                                <button class="btn btn-primary" @onclick="(()=>ModuAyarla(Gosterim.Gorevler))">Görevler</button>
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-info" @onclick="(()=>ModuAyarla(Gosterim.Notlar))">Notlar</button>
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-success" @onclick="(()=>ModuAyarla(Gosterim.Teknolojiler))">Teknoloji</button>
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-danger" @onclick="(()=>ModuAyarla(Gosterim.Butce))">Bütçe</button>
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-warning" @onclick="(()=>ModuAyarla(Gosterim.Kullanicilar))">Kullanicilar</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        @if (gosterilen == Gosterim.Gorevler)
+                        {
+                            <div class="row">
+                                @if (YeniGorev!=null)
+                                {
+                                    <div class="col-12">
+                                        <br/>
+                                        @if (formUyarisi!=null)
+                                        {
+                                            <p class="bg-danger">@formUyarisi</p>
+                                        }
+                                        <br/>
+                                        <EditForm Model="YeniGorev" OnValidSubmit="GorevKayit">
+                                            <div class="row">
+                                                <div class="col-1"></div>
+                                                <div class="col-3">
+                                                    <div class="form-group">
+                                                        <label>Görev Adı</label>
+                                                        <InputText class="form-control" @bind-Value="YeniGorev.GorevAdi" />
+                                                        <ValidationMessage For="@(() => YeniGorev.GorevAdi)" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Açıklama</label>
+                                                        <InputTextArea class="form-control" @bind-Value="YeniGorev.Aciklama" />
+                                                        <ValidationMessage For="@(() => YeniGorev.Aciklama)" />
+                                                    </div>
+                                                </div>
+                                                <div class="col-3">
+                                                    <div class="form-group">
+                                                        <label>Başlangıç Tarihi</label>
+                                                        <InputDate class="form-control" @bind-Value="YeniGorev.BaslangicTarihi" />
+                                                        <ValidationMessage For="@(() => YeniGorev.BaslangicTarihi)" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Beklenen Bitiş Tarihi</label>
+                                                        <InputDate class="form-control" @bind-Value="YeniGorev.BeklenenBitis" />
+                                                        <ValidationMessage For="@(() => YeniGorev.BeklenenBitis)" />
+                                                    </div>
+                                                </div>
+                                                <div class="col-3">
+                                                    <div class="form-group">
+                                                        <label>Görev Sahibi</label>
+                                                        <InputSelect class="form-select" @bind-Value="YeniGorev.GorevSahibiId">
+                                                            <option value=0>Seçiniz</option>
+                                                            @foreach (var kullanici in Kullanicilar)
+                                                            {
+                                                                <option value="@kullanici.Id">@kullanici.AdiSoyadi</option>
+                                                            }
+                                                        </InputSelect>
+                                                        <ValidationMessage For="@(() => YeniGorev.GorevSahibiId)" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Görev Kategorisi</label>
+                                                        <InputSelect class="form-select" @bind-Value="YeniGorev.KategoriId">
+                                                            <option value="">Seçiniz</option>
+                                                            @foreach (var kategori in Kategoriler)
+                                                            {
+                                                                <option value="@kategori.Id">@kategori.KategoriAdi</option>
+                                                            }
+                                                        </InputSelect>
+                                                        <ValidationMessage For="@(() => YeniGorev.KategoriId)" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="form-group text-center">
+                                                <button type="submit" class="btn btn-primary">Görevi Kaydet</button>
+                                            </div>
+                                        </EditForm>
+
+                                    </div>
+                                }
+                                @if (AltGorevler!=null)
+                                {
+                                    <div class="col-12">
+                                        <div class="row">
+                                            @if (YeniAltGorev!=null)
+                                            {
+                                                <div class="col-12">
+                                                    <br /> 
+                                                    @if (formUyarisi != null)
+                                                    {
+                                                        <p class="bg-danger">@formUyarisi</p>
+                                                    }
+                                                    <br />
+                                                    <EditForm Model="YeniAltGorev" OnValidSubmit="AltGorevKayit">
+                                                        <div class="row">
+                                                            <div class="col-1"></div>
+                                                            <div class="col-3">
+                                                                <div class="form-group">
+                                                                    <label>Alt Görev Adı</label>
+                                                                    <InputText class="form-control" @bind-Value="YeniAltGorev.AltGorevAdi" />
+                                                                    <ValidationMessage For="@(() => YeniAltGorev.AltGorevAdi)" />
+                                                                </div>
+                                                                <div class="form-group">
+                                                                    <label>Açıklama</label>
+                                                                    <InputTextArea class="form-control" @bind-Value="YeniAltGorev.Aciklama" />
+                                                                    <ValidationMessage For="@(() => YeniAltGorev.Aciklama)" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="form-group text-center">
+                                                            <button type="submit" class="btn btn-primary">Görevi Kaydet</button>
+                                                        </div>
+                                                    </EditForm>
+                                                </div>
+                                            }
+
+                                            <div class="col-12">
+                                                <div class="row">
+                                                    <div class="col-11"></div>
+                                                    <div class="col-1">
+                                                        <button class="btn btn-outline-dark" @onclick="AltGorevleriKapat">X</button>
+                                                    </div>
+                                                    <div class="col-12"><br />@if (!CalistigimProje.ProjeBittimi)
+                                                        {
+                                                            <button class="btn btn-success" @onclick="AltGorevOlustur">Alt Görev Oluştur</button>
+
+                                                        }<hr />
+
+                                                            </div>
+                                                    <div class="col-12">
+                                                        <table class="table table-hover">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Görev Adı</th>
+                                                                    <th>Açıklama</th>
+                                                                    <th>Bittimi?</th>
+                                                                    <th></th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (AltGorev item in AltGorevler)
+                                                                {
+                                                                    string bittimi = item.Bittimi ? "Evet" : "Hayir";
+                                                                    string css = item.Bittimi ? "text-danger" : "text-success";
+                                                                    <tr class="@css">
+                                                                        <td>@item.AltGorevAdi</td>
+                                                                        <td>@item.Aciklama</td>
+                                                                        <td>@bittimi</td>
+                                                                        @if (item.Bittimi)
+                                                                        {
+                                                                            <td></td>
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            <td><button class="btn btn-outline-success" @onclick="(()=>AltGoreviBitir(item.Id))">Görevi Bitir</button></td>
+                                                                        }
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (GorevNotlari != null)
+                                {
+                                    <div class="col-12">
+                                        <div class="row">
+                                            @if (YeniGorevNot != null)
+                                            {
+                                                <div class="col-12">
+                                                    <br />
+                                                    <br />
+                                                    <EditForm Model="YeniGorevNot" OnValidSubmit="GorevNotKayit">
+                                                        <div class="row">
+                                                            <div class="col-1"></div>
+                                                            <div class="col-3">
+                                                                <div class="form-group">
+                                                                    <label>Not: </label>
+                                                                    <InputTextArea class="form-control" @bind-Value="YeniGorevNot.NotIcerigi" />
+                                                                    <ValidationMessage For="@(() => YeniGorevNot.NotIcerigi)" />
+                                                                </div>
+                                                                <div class="form-group text-center">
+                                                                    <button type="submit" class="btn btn-primary">Not Al</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </EditForm>
+                                                </div>
+                                            }
+
+                                            <div class="col-12">
+                                                <div class="row">
+                                                    <div class="col-11"></div>
+                                                    <div class="col-1">
+                                                        <button class="btn btn-outline-dark" @onclick="NotlariKapat">X</button>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <br />@if(!CalistigimProje.ProjeBittimi){<button class="btn btn-success" @onclick="GorevNotuHazirla">Yeni Not Al</button>
+
+                                                        }<hr />
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <table class="table table-hover">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>İçerik</th>
+                                                                    <th>Tarih</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (GorevNot item in GorevNotlari)
+                                                                {
+                                                                    <tr>
+                                                                        <td>@item.NotIcerigi</td>
+                                                                        <td>@item.NotTarihi.ToString("dd.MM.yyyy")</td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                <div class="col-12">
+                                    @if (!CalistigimProje.ProjeBittimi)
+                                    {
+                                        <button @onclick="YeniGorevEkle" class="btn btn-outline-success">Yeni Görev Ekle</button>
+
+                                    }
+                                    <br/><hr/>
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Id</th>
+                                                <th>Kategori</th>
+                                                <th>Gorev Adi</th>
+                                                <th>Aciklama</th>
+                                                <th>Baslangic Tarihi</th>
+                                                <th>Beklenen Bitis Tarihi</th>
+                                                <th>Bitis Tarihi</th>
+                                                <th>Gorev Sahibi</th>
+                                                <th>Alt Gorev Sayisi</th>
+                                                <th>Not Sayisi</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (Gorev item in Gorevler)
+                                            {
+                                                GorevYardimcisi yardimci = GorevYardimcilari.FirstOrDefault(x => x.GorevId == item.Id);
+                                                string css = "text-black";
+                                                string bitisTarihi = "Bitmedi";
+                                                if (item.BitisTarihi != null)
+                                                {
+                                                    css = "text-danger";
+                                                    bitisTarihi = ((DateTime)item.BitisTarihi).ToString("dd.MM.yyyy");
+                                                }
+                                                if (item.Kategori.Id == 1 && !item.Tamamlandi)
+                                                {
+                                                    css = "text-primary";
+                                                }
+                                                <tr class="@css">
+                                                    <td>@item.Id</td>
+                                                    <td>@item.Kategori.KategoriAdi</td>
+                                                    <td>@item.GorevAdi</td>
+                                                    <td>@item.Aciklama</td>
+                                                    <td>@item.BaslangicTarihi.ToString("dd.MM.yyyy")</td>
+                                                    <td>@item.BeklenenBitis.ToString("dd.MM.yyyy")</td>
+                                                    <td>@bitisTarihi</td>
+                                                    <td>@item.GorevSahibi.AdiSoyadi</td>
+                                                    <td>@yardimci.AltGorevSayisi</td>
+                                                    <td>@yardimci.GorevNotuSayisi</td>
+                                                    @if (!item.Tamamlandi)
+                                                    {
+                                                        <td>
+                                                            <button class="btn btn-outline-danger btn-sm" @onclick="(()=>GorevBitsinmi(item.Id))" data-bs-toggle="modal" data-bs-target="#GorevBitir">Görev Bitti</button>
+                                                            <button class="btn btn-outline-primary btn-sm" @onclick="(()=>AltGorevleriGoster(item.Id))">Alt Görevler</button>
+                                                            <button class="btn btn-outline-info btn-sm" @onclick="(()=>GorevNotlariniGoster(item.Id))">Notları Göster</button>
+                                                        </td>
+                                                    }
+                                                    else
+                                                    {
+                                                        <td>
+                                                            <p class="text-sm-start">@item.SonNot</p>
+                                                            <button class="btn btn-outline-primary btn-sm" @onclick="(()=>AltGorevleriGoster(item.Id))">Alt Görevler</button>
+                                                            <button class="btn btn-outline-info btn-sm" @onclick="(()=>GorevNotlariniGoster(item.Id))">Notları Göster</button>
+                                                        </td>
+                                                    }
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+                        else if (gosterilen == Gosterim.Notlar)
+                        {
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="row">
+                                        @if (YeniProjeNot != null)
+                                        {
+                                            <div class="col-12">
+                                                <br />
+                                                <br />
+                                                <EditForm Model="YeniProjeNot" OnValidSubmit="ProjeNotKayit">
+                                                    <div class="row">
+                                                        <div class="col-1"></div>
+                                                        <div class="col-3">
+                                                            <div class="form-group">
+                                                                <label>Not: </label>
+                                                                <InputTextArea class="form-control" @bind-Value="YeniProjeNot.Icerik" />
+                                                                <ValidationMessage For="@(() => YeniProjeNot.Icerik)" />
+                                                            </div>
+                                                            <div class="form-group text-center">
+                                                                <button type="submit" class="btn btn-primary">Not Al</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </EditForm>
+                                            </div>
+                                        }
+
+                                        <div class="col-12">
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <br />
+                                                    @if (!CalistigimProje.ProjeBittimi)
+                                                    {
+                                                        <button class="btn btn-success" @onclick="YeniProjeNotAc">Yeni Not Al</button>
+
+                                                    }
+                                                    <hr />
+
+                                                </div>
+                                                <div class="col-12">
+                                                    <table class="table table-hover">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>İçerik</th>
+                                                                <th>Tarih</th>
+                                                                <th>Not Sahibi</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach (ProjeNot item in ProjeNotlari.OrderByDescending(x=>x.Gundemde).ThenBy(x=>x.Id))
+                                                            {
+                                                                if (!item.Gundemde)
+                                                                {
+                                                                    <tr class="bg-info">
+                                                                        <td>@item.Icerik</td>
+                                                                        <td>@item.Tarih.ToString("dd.MM.yyyy")</td>
+                                                                        <td>@item.Kullanic.AdiSoyadi</td>
+                                                                        <td><button class="btn btn-outline-danger btn-sm" @onclick="(()=>ProjeNotGundemdenDusur(item))">Gündeme Al</button></td>
+                                                                    </tr>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <tr class="text-danger">
+                                                                        <td>@item.Icerik</td>
+                                                                        <td>@item.Tarih.ToString("dd.MM.yyyy")</td>
+                                                                        <td>@item.Kullanic.AdiSoyadi</td>
+                                                                        <td><button class="btn btn-outline-info btn-sm" @onclick="(()=>ProjeNotGundemdenDusur(item))">Gündemden Düşür</button></td>
+                                                                    </tr>
+                                                                }
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (gosterilen == Gosterim.Teknolojiler)
+                        {
+                            <div class="row">
+                                @if (YeniTeknoloji!=null)
+                                {
+
+                                    <div class="col-12">
+                                        <br />
+                                        @if (formUyarisi != null)
+                                        {
+                                            <p class="bg-danger">@formUyarisi</p>
+                                        }
+                                        <br />
+                                        <EditForm Model="YeniTeknoloji" OnValidSubmit="YeniTeknolojiKaydet">
+                                            <div class="row">
+                                                <div class="col-1"></div>
+                                                <div class="col-3">
+                                                    <div class="form-group">
+                                                        <label>Teknoloji Adı</label>
+                                                        <InputText class="form-control" @bind-Value="YeniTeknoloji.TeknolojiAdi" />
+                                                        <ValidationMessage For="@(() => YeniTeknoloji.TeknolojiAdi)" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Açıklama</label>
+                                                        <InputTextArea class="form-control" @bind-Value="YeniTeknoloji.TeknolojiAciklama" />
+                                                        <ValidationMessage For="@(() => YeniTeknoloji.TeknolojiAciklama)" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="form-group text-center">
+                                                <button type="submit" class="btn btn-primary">Teknoloji Kaydet</button>
+                                            </div>
+                                        </EditForm>
+                                    </div>
+                                }
+                                <div class="col-12">
+                                    <br/>
+                                    <button class="btn btn-success" @onclick="YeniTeknolojiOlusturmaPaneliAc">Yeni Teknoloji Ekle</button>
+                                    <hr/>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Teknoloji</th>
+                                                        <th>Açıklama</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (ProjeTeknoloji item in ProjeTeknolojileri)
+                                                    {
+                                                        <tr>
+                                                            <td>@TumTeknolojiler.FirstOrDefault(x=>x.Id==item.TeknolojiId).TeknolojiAdi</td>
+                                                            <td>@TumTeknolojiler.FirstOrDefault(x=>x.Id==item.TeknolojiId).TeknolojiAciklama</td>
+                                                            <td><button class="btn btn-outline-danger" @onclick="(()=>TeknolojiCikar(item.Id))">Çıkar</button></td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div class="col-6">
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Teknoloji</th>
+                                                        <th>Açıklama</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (Teknoloji item in TumTeknolojiler.OrderBy(x=>x.TeknolojiAdi))
+                                                    {
+                                                        if (ProjeTeknolojileri.FirstOrDefault(x=>x.TeknolojiId==item.Id)!=null)
+                                                        {
+                                                            <tr class="text-danger">
+                                                                <td>@item.TeknolojiAdi</td>
+                                                                <td>@item.TeknolojiAciklama</td>
+                                                                <td></td>
+                                                            </tr>
+                                                        }
+                                                        else
+                                                        {
+                                                            <tr>
+                                                                <td>@item.TeknolojiAdi</td>
+                                                                <td>@item.TeknolojiAciklama</td>
+                                                                <td><button class="btn btn-outline-success" @onclick="(()=>TeknolojiDahilEt(item.Id))">Projeye Ekle</button></td>
+                                                            </tr>
+                                                        }
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (gosterilen == Gosterim.Kullanicilar)
+                        {
+                            <div class="row">
+                                <div class="col-12">
+                                    <div class="row">
+                                        @if (YeniKullanici != null)
+                                        {
+                                            <div class="col-12">
+                                                <br />
+                                                <br />
+                                                <EditForm Model="YeniKullanici" OnValidSubmit="KullaniciKayit">
+                                                    <div class="row">
+                                                        <div class="col-1"></div>
+                                                        <div class="col-3">
+                                                            <div class="form-group">
+                                                                <label>Adi Soyadi: </label>
+                                                                <InputText class="form-control" @bind-Value="YeniKullanici.AdiSoyadi" />
+                                                                <ValidationMessage For="@(() => YeniKullanici.AdiSoyadi)" />
+                                                            </div>
+                                                            <div class="form-group">
+                                                                <label>Kullanici Adi: </label>
+                                                                <InputText class="form-control" @bind-Value="YeniKullanici.KullaniciAdi" />
+                                                                <ValidationMessage For="@(() => YeniKullanici.KullaniciAdi)" />
+                                                            </div>
+                                                            <div class="form-group">
+                                                                <label>Sifre: </label>
+                                                                <InputText class="form-control" type="password" @bind-Value="YeniKullanici.Sifre" />
+                                                                <ValidationMessage For="@(() => YeniKullanici.Sifre)" />
+                                                            </div>
+                                                            <div class="form-group text-center">
+                                                                <button type="submit" class="btn btn-primary">Kaydet</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </EditForm>
+                                            </div>
+                                        }
+
+                                        <div class="col-12">
+                                            <div class="row">
+                                                <div class="col-12"><br /><button class="btn btn-success" @onclick="YeniKullaniciFormu">Yeni Kullanici</button><hr /></div>
+                                                <div class="col-12">
+                                                    <table class="table table-hover">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Id</th>
+                                                                <th>Adı Soyadı</th>
+                                                                <th>Kullanıcı Adı</th>
+                                                                <th>Bekleyen Görev Sayısı</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach (Kullanici item in Kullanicilar)
+                                                            {
+                                                                <tr>
+                                                                    <td>@item.Id</td>
+                                                                    <td>@item.AdiSoyadi</td>
+                                                                    <td>@item.KullaniciAdi</td>
+                                                                    <td>@item.Gorevs.Where(x=>x.Tamamlandi==false).Count()</td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (gosterilen==Gosterim.Butce)
+                        {
+                            <div class="row">
+                                @if (YeniMaliyet!=null)
+                                {
+                                    <div class="col-12">
+                                        <EditForm Model="YeniMaliyet" OnValidSubmit="YeniButceKayit">
+                                            <DataAnnotationsValidator />
+                                            <ValidationSummary />
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <div class="form-group">
+                                                        <label for="Aciklama">Açıklama:</label>
+                                                        <InputTextArea id="Aciklama" class="form-control" @bind-Value="YeniMaliyet.Aciklama" />
+                                                    </div>
+                                                </div>
+                                                <div class="col-12">
+                                                    <div class="row">
+                                                        <div class="col-6">
+                                                            <div class="form-group">
+                                                                <label for="Tarih">Tarih:</label>
+                                                                <InputDate id="Tarih" class="form-control" @bind-Value="YeniMaliyet.Tarih" />
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <div class="form-group">
+                                                                <label for="Tutar">Tutar:</label>
+                                                                <InputNumber id="Tutar" class="form-control" @bind-Value="YeniMaliyet.Tutar" step="0.01" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-12">
+                                                    <div class="row">
+                                                        <div class="col-6">
+                                                            <div class="form-group">
+                                                                <label for="GelirGider">Gelir(işaretle)/Gider(işaretleme):</label>
+                                                                <InputCheckbox id="GelirGider" class="form-check" @bind-Value="YeniMaliyet.GelirGider" />
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <div class="form-group">
+                                                                <label for="Gerçeklesti">Gerçekleştimi?:</label>
+                                                                <InputCheckbox id="Gerçeklesti" class="form-check" @bind-Value="YeniMaliyet.Gerçeklesti" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-12 text-center"><button class="btn btn-primary" type="submit">Kaydet</button></div>
+                                            </div>
+                                        </EditForm>
+                                    </div>  
+                                }
+                                <div class="col-12">
+                                    <br/>
+                                    <button class="btn btn-info" @onclick="ButceKayitFormuAc">Yeni Bütçe Kalemi Oluştur</button>
+                                    <br/>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <h1 class="text-center">Giderler</h1>
+                                            <div class="row">
+                                                <div class="col-6">
+                                                    <h2>Planlanan: @ProjeMaliyetleri.Where(x=>x.GelirGider==false&&!x.Vazgecildi&&!x.Gerçeklesti).Sum(x=>x.Tutar)</h2>
+                                                    </div>
+                                                <div class="col-6"><h2>Harcanan: @ProjeMaliyetleri.Where(x=>x.GelirGider==false&&!x.Vazgecildi&&x.Gerçeklesti).Sum(x=>x.Tutar)</h2></div>
+                                            </div>
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Aciklama</th>
+                                                        <th>Tarih</th>
+                                                        <th>Tutar</th>
+                                                        <th>Gerçekleştimi?</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (ProjeMaliyet item in ProjeMaliyetleri.Where(x => x.GelirGider == false && !x.Vazgecildi))
+                                                    {
+                                                        <tr>
+                                                            <td>@item.Aciklama</td>
+                                                            <td>@item.Tarih</td>
+                                                            <td>@item.Tutar</td>
+                                                            @if (item.Gerçeklesti)
+                                                            {
+                                                                <td>Evet</td>
+                                                            }
+                                                            else
+                                                            {
+                                                                <td>
+                                                                    <button class="btn btn-sm btn-outline-success" @onclick="(()=>ButceKomut(item.Id,1))">Gerçekleşti</button>
+                                                                    <button class="btn btn-sm btn-outline-danger" @onclick="(()=>ButceKomut(item.Id,2))">Vazgeç</button>
+                                                                    <button class="btn btn-sm btn-outline-warning" @onclick="(()=>ButceGuncelle(item.Id))">Güncelle</button>
+                                                                </td>
+                                                            }
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div class="col-6">
+                                            <h1 class="text-center">Gelirler</h1>
+
+                                            <div class="row">
+                                                <div class="col-6">
+                                                    <h2>Planlanan: @ProjeMaliyetleri.Where(x=>x.GelirGider&&!x.Vazgecildi&&!x.Gerçeklesti).Sum(x=>x.Tutar)</h2>
+                                                </div>
+                                                <div class="col-6"><h2>Harcanan: @ProjeMaliyetleri.Where(x=>x.GelirGider&&!x.Vazgecildi&&x.Gerçeklesti).Sum(x=>x.Tutar)</h2></div>
+                                            </div>
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Aciklama</th>
+                                                        <th>Tarih</th>
+                                                        <th>Tutar</th>
+                                                        <th>Gerçekleştimi?</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (ProjeMaliyet item in ProjeMaliyetleri.Where(x => x.GelirGider&&!x.Vazgecildi))
+                                                    {
+                                                        <tr>
+                                                            <td>@item.Aciklama</td>
+                                                            <td>@item.Tarih</td>
+                                                            <td>@item.Tutar</td>
+                                                            @if (item.Gerçeklesti)
+                                                            {
+                                                                <td>Evet</td>
+                                                            }
+                                                            else
+                                                            {
+                                                                <td>
+                                                                    <button class="btn btn-sm btn-outline-success" @onclick="(()=>ButceKomut(item.Id,1))">Gerçekleşti</button>
+                                                                    <button class="btn btn-sm btn-outline-danger" @onclick="(()=>ButceKomut(item.Id,2))">Vazgeç</button>
+                                                                    <button class="btn btn-sm btn-outline-warning" @onclick="(()=>ButceGuncelle(item.Id))">Güncelle</button>
+                                                                </td>
+                                                            }
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div class="col-12">
+                                            <h1 class="text-center">Vazgeçilenler</h1>
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Aciklama</th>
+                                                        <th>Tarih</th>
+                                                        <th>Tutar</th>
+                                                        <th>GelirGider?</th>
+                                                        <th></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (ProjeMaliyet item in ProjeMaliyetleri.Where(x => x.Vazgecildi))
+                                                    {
+                                                        <tr>
+                                                            <td>@item.Aciklama</td>
+                                                            <td>@item.Tarih</td>
+                                                            <td>@item.Tutar</td>
+                                                            @if (item.GelirGider)
+                                                            {
+                                                                <td>Gelir</td>
+                                                            }
+                                                            else
+                                                            {
+                                                                <td>Gider</td>
+                                                            }
+                                                            <td>
+                                                                <button class="btn btn-sm btn-outline-primary" @onclick="(()=>ButceKomut(item.Id,3))">Tekrar gündeme al</button>
+                                                                <button class="btn btn-sm btn-outline-warning" @onclick="(()=>ButceGuncelle(item.Id))">Güncelle</button>
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="modal" id="GorevBitir">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="card-body">
+                        @if (BitecekGorev!=null)
+                        {
+                            <div class="row">
+                                <div class="col-12">
+                                    <h1 class="text-center">Eminmisiniz?</h1>
+                                </div>
+                                <div class="col-6">
+                                    <EditForm Model="BitecekGorev" OnValidSubmit="GoreviBitir">
+                                        <InputTextArea class="form-control" @bind-Value="BitecekGorev.SonNot" />
+                                        <ValidationMessage For="@(() => BitecekGorev.SonNot)" />
+                                        <button type="submit" class="btn btn-primary btn-sm" data-dismiss="modal" aria-label="Close">Gorevi Bitir</button>
+                                    </EditForm>
+                                </div>
+                                <div class="col-6">
+                                    <button type="button" class="btn btn-warning btn-sm" data-dismiss="modal" aria-label="Close">Vazgeç</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <!-- /.modal-content -->
+        </div>
+    </div>
+}
+else
+{
+    <p class="bg-success">Yükleniyor</p>
+}

@@ -1,0 +1,1 @@
+﻿Scaffold-DbContext "Server=.;User Id=sa;Password=1234;Database=ProjeYonetimdb;Max Pool Size=1000;MultipleActiveResultSets=True;Connection Timeout=500;TrustServerCertificate=true" Microsoft.EntityFrameworkCore.SqlServer -o Models/MyDataBase -Context ProjectContext -DataAnnotations -Force
